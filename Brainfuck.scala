@@ -6,60 +6,73 @@ import scala.collection.mutable.MutableList
 import scala.annotation.switch
 import scala.annotation.tailrec
 
-
 object Brainfuck {
+
+    // Called on launch. Runs a programme from a file, if one is passed as an argument. Otherwise, runs Hello World
     def main(args: Array[String]) {
         if(args.length < 1) {
-            println("Invalid arguments: No input file specified")
+            println("Invalid arguments: No input file specified. Running demo code...")
+            execute("++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.")
         }    
-        else {
-            try {
-                runFile(args(0))
-            } 
-            catch {
-                case _ : Throwable => println("Unknow runtime error")
-            }
-        }
+        else runFile(args(0))
     }
 
+    // Helper method that reads a script file into the interpreter
     def runFile(path : String) {
         val data = Source.fromFile(path).mkString
         execute(data)
     }
 
+    // This method includes the actual interpreter
     def execute(code: String) {
         val inst = code.toCharArray
         val mem = MutableList.fill(1048576)(0x00)
-        var memp = 0
-        def execSimple(inst : Char) = {
-            (inst: @switch) match {
+        var pointer = 0
+        nextStep(0)
+
+        // Loops through the instruction array
+        @tailrec def nextStep(i : Int) {
+            if(i < inst.length) {
+                val state = execInstruction(inst(i))
+                if(state == 1)
+                    nextStep(jumpForward(i))
+                else if(state == (-1))
+                    nextStep(jumpBackward(i))
+                else
+                    nextStep(i + 1)
+            }
+        }
+
+        // Executes the instruction represented by the given character and returns 0 for a forward step, 1 for a forward jump, and -1 for a backward jump
+        def execInstruction(instruction : Char) = {
+            (instruction: @switch) match {
                 case '>' => {
-                    memp += 1
-                    if(memp >= mem.length-2)
+                    pointer += 1
+                    if(pointer >= mem.length-2)
                         mem += 0x00
                     0
                 }
                 case '<' => {
-                    if(memp >= 0)
-                        memp -= 1
+                    if(pointer >= 0)
+                        pointer -= 1
                     0
                 }
                 case '+' => {
-                    if(mem(memp) < 0xFF)
-                        mem(memp) += 1
+                    if(mem(pointer) < 0xFF)
+                        mem(pointer) += 1
                     0
                 }
                 case '-' => {
-                    if(mem(memp) > 0x00)
-                        mem(memp) -= 1
+                    if(mem(pointer) > 0x00)
+                        mem(pointer) -= 1
                     0
                 }
                 case '.' => {
-                    print(mem(memp).toChar)
+                    print(mem(pointer).toChar)
                     0
                 }
                 case ',' => {
-                    mem(memp) = StdIn.readChar.toByte
+                    mem(pointer) = StdIn.readChar.toByte
                     0
                 }
                 case '[' => 1
@@ -68,8 +81,9 @@ object Brainfuck {
             }
         }
 
+        // Called when the interpreter hits a forward jump instruction "[". Returns the new address of the instruction pointer.
         def jumpForward(i : Int) : Int = {
-            if(mem(memp) == 0x00) {
+            if(mem(pointer) == 0x00) {
                 @tailrec def check(j : Int, skip : Int) : Int =
                 if(inst(j) == '[')
                     check(j + 1, skip + 1)
@@ -81,12 +95,12 @@ object Brainfuck {
                     check(j + 1, skip)
                 check(i + 1, 0)
             }
-            else
-                i + 1
+            else i + 1
         }
 
+        // Called when the interpreter hits a backward jump instruction "]". Returns the new address of the instruction pointer.
         def jumpBackward(i : Int) : Int = {
-            if(mem(memp) != 0x00) {
+            if(mem(pointer) != 0x00) {
                 @tailrec def check(j : Int, skip : Int) : Int =
                 if(inst(j) == ']')
                     check(j - 1, skip + 1)
@@ -98,21 +112,7 @@ object Brainfuck {
                     check(j - 1, skip)
                 check(i - 1, 0)
             }
-            else
-                i + 1
+            else i + 1
         }
-
-        @tailrec def loop(i : Int) {
-            if(i < inst.length) {
-                val state = execSimple(inst(i))
-                if(state == 1)
-                    loop(jumpForward(i))
-                else if(state == (-1))
-                    loop(jumpBackward(i))
-                else
-                    loop(i + 1)
-            }
-        }
-        loop(0)
-    }
+    }        
 }
