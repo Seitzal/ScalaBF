@@ -115,4 +115,4 @@ object Brainfuck {
             else i + 1
         }
     }        
-}
+}//
